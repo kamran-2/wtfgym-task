@@ -26,11 +26,25 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
+function toLocalDate(d) {
+  return d.toISOString().split('T')[0];
+}
+
 export default function RevenueBreakdown({ data, gyms }) {
   const [view, setView] = useState('bar');
   const [selectedGym, setSelectedGym] = useState('all');
+  const today = toLocalDate(new Date());
+  const thirtyDaysAgo = toLocalDate(new Date(Date.now() - 29 * 86400000));
+  const [fromDate, setFromDate] = useState(thirtyDaysAgo);
+  const [toDate, setToDate] = useState(today);
 
-  const filtered = selectedGym === 'all' ? data : data.filter(d => String(d.gym_id) === selectedGym);
+  const filtered = data.filter(d => {
+    if (selectedGym !== 'all' && String(d.gym_id) !== selectedGym) return false;
+    const rd = d.revenue_date ? d.revenue_date.split('T')[0] : null;
+    if (rd && fromDate && rd < fromDate) return false;
+    if (rd && toDate && rd > toDate) return false;
+    return true;
+  });
 
   // Aggregate by gym + plan_type
   const gymPlanMap = {};
@@ -50,9 +64,12 @@ export default function RevenueBreakdown({ data, gyms }) {
 
   return (
     <div style={styles.container}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <div style={styles.title}>30-Day Revenue by Plan</div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={styles.title}>Revenue by Plan</div>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input type="date" style={styles.select} value={fromDate} max={toDate} onChange={e => setFromDate(e.target.value)} />
+          <span style={{ color: '#718096', fontSize: '12px' }}>to</span>
+          <input type="date" style={styles.select} value={toDate} min={fromDate} max={today} onChange={e => setToDate(e.target.value)} />
           <select style={styles.select} value={selectedGym} onChange={e => setSelectedGym(e.target.value)}>
             <option value="all">All Gyms</option>
             {gyms.map(g => <option key={g.id} value={String(g.id)}>{g.name}</option>)}

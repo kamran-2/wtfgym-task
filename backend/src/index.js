@@ -4,11 +4,12 @@ const WebSocket = require('ws');
 const cors = require('cors');
 const db = require('./db');
 
-const dashboardRoutes = require('./routes/dashboard');
-const analyticsRoutes = require('./routes/analytics');
-const anomalyRoutes = require('./routes/anomalies');
-const AnomalyEngine = require('./services/anomalyEngine');
-const DataSimulator = require('./services/simulator');
+const dashboardRoutes  = require('./routes/dashboard');
+const analyticsRoutes  = require('./routes/analytics');
+const anomalyRoutes    = require('./routes/anomalies');
+const simulatorRoutes  = require('./routes/simulator');
+const AnomalyEngine    = require('./services/anomalyEngine');
+const DataSimulator    = require('./services/simulator');
 
 const app = express();
 const server = http.createServer(app);
@@ -74,10 +75,13 @@ app.post('/api/analytics/refresh', async (req, res) => {
 
 // Start services
 const anomalyEngine = new AnomalyEngine(broadcast);
-const simulator = new DataSimulator(broadcast);
+const simulator     = new DataSimulator(broadcast);
 
 anomalyEngine.start();
 simulator.start();
+
+// Simulator control route (needs live simulator instance)
+app.use('/api/simulator', simulatorRoutes(simulator));
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {

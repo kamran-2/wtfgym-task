@@ -17,9 +17,8 @@ const PLAN_COLORS = { Monthly: '#63b3ed22', Quarterly: '#9f7aea22', Annual: '#68
 const PLAN_TEXT = { Monthly: '#63b3ed', Quarterly: '#9f7aea', Annual: '#68d391' };
 
 function getRiskLevel(days) {
-  if (days > 30) return { label: 'HIGH', color: '#fc8181', bg: '#fc818122' };
-  if (days > 21) return { label: 'MEDIUM', color: '#f6ad55', bg: '#f6ad5522' };
-  return { label: 'LOW', color: '#68d391', bg: '#68d39122' };
+  if (days >= 60) return { label: 'CRITICAL', color: '#fc8181', bg: '#fc818122' };
+  return { label: 'HIGH', color: '#f6ad55', bg: '#f6ad5522' };
 }
 
 function formatLastSeen(ts) {
@@ -51,7 +50,7 @@ export default function ChurnRiskPanel({ members }) {
               </tr>
             </thead>
             <tbody>
-              {members.slice(0, 50).map(m => {
+              {members.slice(0, 100).map(m => {
                 const days = parseFloat(m.days_inactive || 99);
                 const risk = getRiskLevel(days);
                 return (

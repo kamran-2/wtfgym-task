@@ -24,10 +24,9 @@ const styles = {
 };
 
 function getOccupancyColor(pct) {
-  if (pct >= 90) return '#fc8181'; // red
-  if (pct >= 70) return '#f6ad55'; // orange
-  if (pct >= 40) return '#68d391'; // green
-  return '#63b3ed';                // blue
+  if (pct > 85) return '#fc8181';  // red
+  if (pct >= 60) return '#fbbf24'; // yellow
+  return '#68d391';                // green
 }
 
 export default function OccupancyCard({ gym, liveData }) {
@@ -37,17 +36,17 @@ export default function OccupancyCard({ gym, liveData }) {
   const color = getOccupancyColor(pct);
 
   const revenueToday = parseFloat(liveData?.revenue_today ?? gym.revenue_today ?? 0);
-  const statusColor = pct >= 90 ? '#fc8181' : pct >= 70 ? '#f6ad55' : '#68d391';
+  const statusColor = color;
 
   return (
-    <div style={{ ...styles.card, borderColor: pct >= 90 ? '#fc8181' : '#2d2d44' }}>
+    <div style={{ ...styles.card, borderColor: pct > 85 ? '#fc8181' : '#2d2d44' }}>
       <div style={styles.header}>
         <div>
           <div style={styles.gymName}>{gym.name}</div>
           <div style={styles.city}>{gym.city}</div>
         </div>
         <span style={{ ...styles.badge, background: `${statusColor}22`, color: statusColor }}>
-          {pct >= 90 ? '🔴 FULL' : pct >= 70 ? '🟠 BUSY' : pct >= 40 ? '🟢 ACTIVE' : '🔵 QUIET'}
+          {pct > 85 ? '🔴 HIGH' : pct >= 60 ? '🟡 BUSY' : '🟢 ACTIVE'}
         </span>
       </div>
 

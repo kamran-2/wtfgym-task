@@ -12,15 +12,19 @@ router.get('/', async (req, res) => {
         g.city,
         g.capacity,
         g.status,
-        COUNT(c.id) FILTER (WHERE c.checked_out_at IS NULL) AS current_occupancy,
+        COALESCE(occ.current_occupancy, 0) AS current_occupancy,
         COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= NOW() - INTERVAL '24 hours'), 0) AS revenue_today,
         COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= DATE_TRUNC('month', NOW())), 0) AS revenue_month,
         COUNT(DISTINCT m.id) AS total_members
       FROM gyms g
-      LEFT JOIN checkins c ON c.gym_id = g.id AND c.checked_in_at >= NOW() - INTERVAL '12 hours'
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS current_occupancy
+        FROM checkins c
+        WHERE c.gym_id = g.id AND c.checked_out_at IS NULL
+      ) occ ON TRUE
       LEFT JOIN payments p ON p.gym_id = g.id
       LEFT JOIN members m ON m.gym_id = g.id
-      GROUP BY g.id
+      GROUP BY g.id, occ.current_occupancy
       ORDER BY g.name
     `);
     res.json(rows);
@@ -36,6 +40,7 @@ router.get('/activity-feed', async (req, res) => {
     const { rows } = await db.query(`
       SELECT
         c.id,
+        g.id AS gym_id,
         g.name AS gym_name,
         m.name AS member_name,
         m.plan_type,
@@ -60,13 +65,17 @@ router.get('/gym/:id', async (req, res) => {
     const { rows } = await db.query(`
       SELECT
         g.*,
-        COUNT(c.id) FILTER (WHERE c.checked_out_at IS NULL) AS current_occupancy,
+        COALESCE(occ.current_occupancy, 0) AS current_occupancy,
         COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= DATE_TRUNC('day', NOW())), 0) AS revenue_today
       FROM gyms g
-      LEFT JOIN checkins c ON c.gym_id = g.id AND c.checked_in_at >= NOW() - INTERVAL '12 hours'
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS current_occupancy
+        FROM checkins c
+        WHERE c.gym_id = g.id AND c.checked_out_at IS NULL
+      ) occ ON TRUE
       LEFT JOIN payments p ON p.gym_id = g.id
       WHERE g.id = $1
-      GROUP BY g.id
+      GROUP BY g.id, occ.current_occupancy
     `, [req.params.id]);
 
     if (!rows[0]) return res.status(404).json({ error: 'Gym not found' });

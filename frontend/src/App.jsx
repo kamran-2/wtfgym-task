@@ -2,26 +2,27 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import OccupancyCard from './components/Dashboard/OccupancyCard';
 import RevenueTicker from './components/Dashboard/RevenueTicker';
 import ActivityFeed from './components/Dashboard/ActivityFeed';
+import SummaryBar from './components/Dashboard/SummaryBar';
 import PeakHourHeatmap from './components/Analytics/PeakHourHeatmap';
 import RevenueBreakdown from './components/Analytics/RevenueBreakdown';
 import ChurnRiskPanel from './components/Analytics/ChurnRiskPanel';
+import NewVsRenewal from './components/Analytics/NewVsRenewal';
+import CrossGymRevenue from './components/Analytics/CrossGymRevenue';
 import AnomalyAlerts from './components/Anomalies/AnomalyAlerts';
+import SimulatorPanel from './components/Simulator/SimulatorPanel';
 import { useWebSocket } from './hooks/useWebSocket';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
-// ─── Sidebar nav items matching spec exactly ──────────────────────────────────
 const NAV_ITEMS = [
   { id: 'live-monitor', label: 'Live Monitor',  icon: '⚡' },
   { id: 'analytics',    label: 'Analytics',     icon: '📊' },
   { id: 'anomaly-logs', label: 'Anomaly Logs',  icon: '🚨' },
 ];
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const S = {
   app: { display: 'flex', minHeight: '100vh', background: '#0D0D1A', color: '#e2e8f0' },
 
-  // Sidebar
   sidebar: {
     width: '220px',
     flexShrink: 0,
@@ -35,10 +36,7 @@ const S = {
     height: '100vh',
     zIndex: 100,
   },
-  sidebarLogo: {
-    padding: '20px 20px 16px',
-    borderBottom: '1px solid #2d2d44',
-  },
+  sidebarLogo: { padding: '20px 20px 16px', borderBottom: '1px solid #2d2d44' },
   logoText: { fontSize: '16px', fontWeight: '800', color: '#9f7aea', letterSpacing: '1px' },
   logoSub: { fontSize: '11px', color: '#4a5568', marginTop: '3px' },
   navList: { flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '4px' },
@@ -54,6 +52,7 @@ const S = {
     marginLeft: 'auto', background: '#fc818133', color: '#fc8181',
     borderRadius: '12px', padding: '1px 7px', fontSize: '11px', fontWeight: '700',
   },
+  sidebarSim: { padding: '12px 10px', borderTop: '1px solid #2d2d44' },
   sidebarFooter: {
     padding: '14px 16px', borderTop: '1px solid #2d2d44',
     display: 'flex', alignItems: 'center', gap: '8px',
@@ -61,7 +60,6 @@ const S = {
   wsDot: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0 },
   wsLabel: { fontSize: '12px' },
 
-  // Main content
   main: { marginLeft: '220px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' },
   topbar: {
     background: '#1A1A2E', borderBottom: '1px solid #2d2d44',
@@ -70,6 +68,12 @@ const S = {
   },
   pageTitle: { fontSize: '17px', fontWeight: '700', color: '#e2e8f0' },
   pageDesc: { fontSize: '12px', color: '#718096', marginTop: '1px' },
+  topbarRight: { display: 'flex', gap: '10px', alignItems: 'center' },
+  gymSelect: {
+    background: '#0D0D1A', color: '#e2e8f0',
+    border: '1px solid #4a5568', borderRadius: '6px',
+    padding: '6px 10px', fontSize: '13px', cursor: 'pointer',
+  },
   refreshBtn: {
     background: '#2d2d44', border: '1px solid #4a5568', color: '#a0aec0',
     borderRadius: '6px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer',
@@ -80,15 +84,14 @@ const S = {
   sectionLabel: { fontSize: '12px', fontWeight: '600', color: '#718096', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' },
   grid4: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' },
+  twoColEven: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' },
 
-  // Loading screen
   loading: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0D0D1A' },
   loadingBox: { textAlign: 'center' },
 };
 
-// ─── Page meta ────────────────────────────────────────────────────────────────
 const PAGE_META = {
-  'live-monitor': { title: 'Live Monitor', desc: 'Real-time occupancy, revenue, and activity across all 10 gyms' },
+  'live-monitor': { title: 'Live Monitor', desc: 'Real-time occupancy, revenue, and activity across all gyms' },
   'analytics':    { title: 'Analytics',    desc: '7-day peak hour heatmap, 30-day revenue breakdown, churn risk' },
   'anomaly-logs': { title: 'Anomaly Logs', desc: 'Active and historical anomaly detections — refreshed every 30s' },
 };
@@ -96,6 +99,7 @@ const PAGE_META = {
 export default function App() {
   const [activePage, setActivePage] = useState('live-monitor');
   const [wsConnected, setWsConnected] = useState(false);
+  const [selectedGym, setSelectedGym] = useState('all');
 
   const [gyms, setGyms]             = useState([]);
   const [activities, setActivities] = useState([]);
@@ -142,6 +146,16 @@ export default function App() {
     fetchAll();
   }, []);
 
+  // Refetch churn when gym changes
+  useEffect(() => {
+    if (loading) return;
+    const params = selectedGym !== 'all' ? `?gym_id=${selectedGym}` : '';
+    fetch(`${API}/api/analytics/churn-risk${params}`)
+      .then(r => r.json())
+      .then(d => setChurnData(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, [selectedGym, loading]);
+
   // WebSocket
   const handleWsMessage = useCallback((msg) => {
     if (msg.type === 'CONNECTED') { setWsConnected(true); return; }
@@ -158,6 +172,7 @@ export default function App() {
           id: e.checkin_id || e.payment_id || Math.random(),
           member_name: `Member #${e.member_id}`,
           gym_name: e.gym_name,
+          gym_id: e.gym_id,
           plan_type: e.plan_type,
           event_type: e.type,
           type: e.type,
@@ -195,10 +210,21 @@ export default function App() {
     setRefreshing(false);
   }
 
+  // Apply live occupancy updates to gyms
   const displayGyms = gyms.map(g => ({
     ...g,
     current_occupancy: liveOccupancy[g.id]?.current_occupancy ?? g.current_occupancy,
+    revenue_today: liveOccupancy[g.id]?.revenue_today ?? g.revenue_today,
   }));
+
+  // Filter by selected gym
+  const filteredGyms = selectedGym === 'all'
+    ? displayGyms
+    : displayGyms.filter(g => String(g.id) === selectedGym);
+
+  const filteredActivities = selectedGym === 'all'
+    ? activities
+    : activities.filter(a => String(a.gym_id) === selectedGym || a.gym_name === gyms.find(g => String(g.id) === selectedGym)?.name);
 
   const meta = PAGE_META[activePage];
 
@@ -253,6 +279,11 @@ export default function App() {
           })}
         </nav>
 
+        {/* Simulator panel in sidebar */}
+        <div style={S.sidebarSim}>
+          <SimulatorPanel />
+        </div>
+
         <div style={S.sidebarFooter}>
           <div style={{ ...S.wsDot, background: wsConnected ? '#68d391' : '#fc8181', animation: wsConnected ? 'pulse 1.5s infinite' : 'none' }} />
           <span style={{ ...S.wsLabel, color: wsConnected ? '#68d391' : '#fc8181' }}>
@@ -269,42 +300,61 @@ export default function App() {
             <div style={S.pageTitle}>{meta.title}</div>
             <div style={S.pageDesc}>{meta.desc}</div>
           </div>
-          {activePage === 'analytics' && (
-            <button style={S.refreshBtn} onClick={handleRefresh} disabled={refreshing}>
-              <span style={{ display: 'inline-block', animation: refreshing ? 'spin 1s linear infinite' : 'none' }}>↻</span>
-              {refreshing ? 'Refreshing...' : 'Refresh Views'}
-            </button>
-          )}
-          {activePage === 'anomaly-logs' && anomalyTime && (
-            <div style={{ fontSize: '12px', color: '#718096' }}>
-              Last scan: {new Date(anomalyTime).toLocaleTimeString('en-IN')} · auto every 30s
-            </div>
-          )}
+          <div style={S.topbarRight}>
+            {/* Gym selector (M-01) */}
+            <select
+              style={S.gymSelect}
+              value={selectedGym}
+              onChange={e => setSelectedGym(e.target.value)}
+            >
+              <option value="all">All Gyms</option>
+              {gyms.map(g => (
+                <option key={g.id} value={String(g.id)}>{g.name.replace('WTF Gyms — ', '')}</option>
+              ))}
+            </select>
+
+            {activePage === 'analytics' && (
+              <button style={S.refreshBtn} onClick={handleRefresh} disabled={refreshing}>
+                <span style={{ display: 'inline-block', animation: refreshing ? 'spin 1s linear infinite' : 'none' }}>↻</span>
+                {refreshing ? 'Refreshing...' : 'Refresh Views'}
+              </button>
+            )}
+            {activePage === 'anomaly-logs' && anomalyTime && (
+              <div style={{ fontSize: '12px', color: '#718096' }}>
+                Last scan: {new Date(anomalyTime).toLocaleTimeString('en-IN')} · auto every 30s
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Page content */}
         <main style={S.content}>
+
+          {/* ── SUMMARY BAR (all pages) ── */}
+          <SummaryBar gyms={displayGyms} anomalies={anomalies} />
 
           {/* ── LIVE MONITOR ── */}
           {activePage === 'live-monitor' && (
             <>
               <div style={S.section}>
                 <div style={S.sectionLabel}>Revenue Overview</div>
-                <RevenueTicker gyms={displayGyms} />
+                <RevenueTicker gyms={filteredGyms} />
               </div>
 
               <div style={S.twoCol}>
                 <div>
-                  <div style={S.sectionLabel}>Live Occupancy — {displayGyms.length} Gyms</div>
+                  <div style={S.sectionLabel}>
+                    Live Occupancy — {filteredGyms.length} Gym{filteredGyms.length !== 1 ? 's' : ''}
+                  </div>
                   <div style={S.grid4}>
-                    {displayGyms.map(gym => (
+                    {filteredGyms.map(gym => (
                       <OccupancyCard key={gym.id} gym={gym} liveData={liveOccupancy[gym.id]} />
                     ))}
                   </div>
                 </div>
                 <div>
-                  <div style={S.sectionLabel}>Activity Feed</div>
-                  <ActivityFeed activities={activities} />
+                  <div style={S.sectionLabel}>Activity Feed (last 20)</div>
+                  <ActivityFeed activities={filteredActivities} />
                 </div>
               </div>
             </>
@@ -315,14 +365,30 @@ export default function App() {
             <>
               <div style={S.section}>
                 <div style={S.sectionLabel}>Peak Hour Heatmap (7 Days)</div>
-                <PeakHourHeatmap data={heatmapData} gyms={gyms} />
+                <PeakHourHeatmap
+                  data={selectedGym === 'all' ? heatmapData : heatmapData.filter(d => String(d.gym_id) === selectedGym)}
+                  gyms={selectedGym === 'all' ? gyms : gyms.filter(g => String(g.id) === selectedGym)}
+                />
               </div>
               <div style={S.section}>
-                <div style={S.sectionLabel}>Revenue Breakdown (30 Days)</div>
-                <RevenueBreakdown data={revenueData} gyms={gyms} />
+                <div style={S.sectionLabel}>Revenue Breakdown</div>
+                <RevenueBreakdown
+                  data={selectedGym === 'all' ? revenueData : revenueData.filter(d => String(d.gym_id) === selectedGym)}
+                  gyms={gyms}
+                />
+              </div>
+              <div style={{ ...S.twoColEven, marginBottom: '26px' }}>
+                <div>
+                  <div style={S.sectionLabel}>New vs Renewal Members (A-04)</div>
+                  <NewVsRenewal gymId={selectedGym} gyms={gyms} />
+                </div>
+                <div>
+                  <div style={S.sectionLabel}>Cross-Gym Revenue Ranking (A-05)</div>
+                  <CrossGymRevenue />
+                </div>
               </div>
               <div style={S.section}>
-                <div style={S.sectionLabel}>Churn Risk Panel (&gt;14 days inactive)</div>
+                <div style={S.sectionLabel}>Churn Risk Panel (&gt;45 days inactive)</div>
                 <ChurnRiskPanel members={churnData} />
               </div>
             </>
@@ -334,14 +400,17 @@ export default function App() {
               {anomalies.length > 0 && (
                 <div style={{ ...S.section, background: '#fc818108', borderRadius: '10px', padding: '14px 16px', border: '1px solid #fc818122', marginBottom: '20px' }}>
                   <div style={{ fontSize: '13px', fontWeight: '600', color: '#fc8181', marginBottom: '4px' }}>
-                    {anomalies.length} Active Anomaly{anomalies.length !== 1 ? 'ies' : ''} Detected
+                    {anomalies.length} Active Anomal{anomalies.length !== 1 ? 'ies' : 'y'} Detected
                   </div>
                   <div style={{ fontSize: '12px', color: '#718096' }}>
                     Alerts are persisted to the database and auto-refreshed every 30 seconds.
                   </div>
                 </div>
               )}
-              <AnomalyAlerts anomalies={anomalies} lastChecked={anomalyTime} />
+              <AnomalyAlerts
+                anomalies={selectedGym === 'all' ? anomalies : anomalies.filter(a => String(a.gym_id) === selectedGym)}
+                lastChecked={anomalyTime}
+              />
             </>
           )}
 

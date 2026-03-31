@@ -41,19 +41,27 @@ class AnomalyEngine {
         });
       }
 
-      // 2. Zero check-ins >2h
-      const { rows: zero } = await db.query(`
-        SELECT g.id AS gym_id, g.name AS gym_name,
-               MAX(c.checked_in_at) AS last_activity,
-               EXTRACT(EPOCH FROM (NOW() - MAX(c.checked_in_at))) / 3600 AS hours_idle,
-               COUNT(c2.id) AS open_checkins
-        FROM gyms g
-        LEFT JOIN checkins c ON c.gym_id = g.id
-        LEFT JOIN checkins c2 ON c2.gym_id = g.id AND c2.checked_out_at IS NULL
-        GROUP BY g.id
-        HAVING COUNT(c2.id) = 0
-           AND (MAX(c.checked_in_at) IS NULL OR MAX(c.checked_in_at) < NOW() - INTERVAL '2 hours')
-      `);
+      // 2. Zero check-ins >2h — ONLY during operating hours (6am–10pm local)
+      const currentHour = new Date().getHours();
+      const isDuringOperatingHours = currentHour >= 6 && currentHour < 22;
+
+      const zero = [];
+      if (isDuringOperatingHours) {
+        const { rows: zeroRows } = await db.query(`
+          SELECT g.id AS gym_id, g.name AS gym_name,
+                 MAX(c.checked_in_at) AS last_activity,
+                 EXTRACT(EPOCH FROM (NOW() - MAX(c.checked_in_at))) / 3600 AS hours_idle,
+                 COUNT(c2.id) AS open_checkins
+          FROM gyms g
+          LEFT JOIN checkins c ON c.gym_id = g.id
+          LEFT JOIN checkins c2 ON c2.gym_id = g.id AND c2.checked_out_at IS NULL
+          WHERE g.status = 'active'
+          GROUP BY g.id
+          HAVING COUNT(c2.id) = 0
+             AND (MAX(c.checked_in_at) IS NULL OR MAX(c.checked_in_at) < NOW() - INTERVAL '2 hours')
+        `);
+        zero.push(...zeroRows);
+      }
       for (const r of zero) {
         const h = r.hours_idle ? parseFloat(r.hours_idle).toFixed(1) : '?';
         anomalies.push({

@@ -54,7 +54,7 @@ export default function ActivityFeed({ activities }) {
         </span>
       </div>
       <div ref={listRef} style={styles.list}>
-        {activities.map((item, idx) => {
+        {activities.slice(0, 20).map((item, idx) => {
           const evtType = item.event_type || item.type;
           const color = EVENT_COLORS[evtType] || '#a0aec0';
           const icon = EVENT_ICONS[evtType] || '⚡';
