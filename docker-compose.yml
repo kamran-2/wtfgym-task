@@ -1,0 +1,55 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: wtfgym_postgres
+    environment:
+      POSTGRES_DB: wtfgym
+      POSTGRES_USER: wtfgym
+      POSTGRES_PASSWORD: wtfgym_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wtfgym -d wtfgym"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wtfgym_backend
+    environment:
+      DATABASE_URL: postgres://wtfgym:wtfgym_secret@postgres:5432/wtfgym
+      PORT: 4000
+      NODE_ENV: production
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: sh -c "node src/db/seed.js && node src/index.js"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: wtfgym_frontend
+    environment:
+      VITE_API_URL: http://localhost:4000
+      VITE_WS_URL: ws://localhost:4000
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
