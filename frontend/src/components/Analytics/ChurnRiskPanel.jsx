@@ -1,4 +1,3 @@
-import React from 'react';
 
 const styles = {
   container: { background: '#1A1A2E', borderRadius: '12px', border: '1px solid #2d2d44', overflow: 'hidden' },
@@ -38,8 +37,8 @@ export default function ChurnRiskPanel({ members }) {
       {members.length === 0 ? (
         <div style={styles.empty}>No high-risk members detected</div>
       ) : (
-        <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
-          <table style={styles.table}>
+        <div className="table-scroll" style={{ maxHeight: '320px', overflowY: 'auto' }}>
+          <table style={{ ...styles.table, minWidth: '480px' }}>
             <thead>
               <tr>
                 <th style={styles.th}>Member</th>

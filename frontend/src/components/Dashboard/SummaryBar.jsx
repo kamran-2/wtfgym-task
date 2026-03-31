@@ -1,12 +1,4 @@
-import React from 'react';
-
 const styles = {
-  bar: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '12px',
-    marginBottom: '24px',
-  },
   card: {
     background: '#1A1A2E',
     borderRadius: '10px',
@@ -31,7 +23,7 @@ export default function SummaryBar({ gyms, anomalies }) {
   const occColor = overallPct > 85 ? '#fc8181' : overallPct >= 60 ? '#fbbf24' : '#68d391';
 
   return (
-    <div style={styles.bar}>
+    <div className="summary-bar">
       <div style={styles.card}>
         <div style={styles.label}>Live Occupancy</div>
         <div style={{ ...styles.value, color: occColor }}>{totalCheckedIn.toLocaleString('en-IN')}</div>
